@@ -286,12 +286,12 @@ async function loadItems() {
         : `<span class="item-thumb-text">${escapeHtml(item.name.charAt(0))}</span>`;
       let boxTag;
       if (item.box_id) {
-        boxTag = `<span class="item-box-tag clickable" onclick="event.stopPropagation();openBoxChanger(${item.id})">箱#${String(item.box_id).padStart(2,"0")} <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 11v3h3L14 5l-3-3L2 11zm13-6L12 2l1.5-1.5a1 1 0 011.4 0L17 2.6a1 1 0 010 1.4L15 5z"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable" onclick="event.stopPropagation();openBoxChanger(${item.id})">箱#${String(item.box_id).padStart(2,"0")} <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       } else if (["已装箱","已寄出","已签收"].includes(item.status)) {
         // 状态表示已装箱但无箱子归属 — 显示为异常待分配
-        boxTag = `<span class="item-box-tag clickable warn" onclick="event.stopPropagation();openBoxChanger(${item.id})">未分配箱子 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2v12M2 2v12"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable warn" onclick="event.stopPropagation();openBoxChanger(${item.id})">未分配箱子 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       } else {
-        boxTag = `<span class="item-box-tag clickable empty" onclick="event.stopPropagation();openBoxChanger(${item.id})">未装箱 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2v12M2 2v12"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable empty" onclick="event.stopPropagation();openBoxChanger(${item.id})">未装箱 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       }
       const fragile = item.is_fragile ? '<span class="tag tag-fragile">易碎</span>' : "";
       const isSelected = selectedItems.has(item.id);
@@ -491,6 +491,23 @@ async function openBatchStatus() {
 }
 
 async function batchUpdateStatus(status) {
+  // 已装箱/已寄出/已签收 需要先有箱子，否则 enforceItemConsistency 会强制回滚
+  if (["已装箱", "已寄出", "已签收"].includes(status)) {
+    const ids = Array.from(selectedItems);
+    const allItems = await api("/items?keyword=");
+    const selected = allItems.filter(i => ids.includes(i.id));
+    const needBox = selected.filter(i => !i.box_id);
+    if (needBox.length > 0) {
+      // 有物品没箱子 → 弹箱选择框，选好后再批量改
+      document.getElementById("batch-status-modal")?.remove();
+      openBatchBoxForStatus(status, needBox);
+      return;
+    }
+  }
+  await doBatchUpdateStatus(status);
+}
+
+async function doBatchUpdateStatus(status) {
   try {
     const ids = Array.from(selectedItems);
     const result = await api("/items/batch", {
@@ -498,12 +515,81 @@ async function batchUpdateStatus(status) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids, action: "status", value: status }),
     });
-    toast(`已更新 ${result.updated} 件物品状态为"${status}"`);
+    const n = result.updated ?? ids.length;
+    toast(`已更新 ${n} 件物品状态为"${status}"`);
     document.getElementById("batch-status-modal")?.remove();
     selectedItems.clear();
     removeBatchBar();
     loadItems();
   } catch (e) { toast("批量更新失败: " + e.message); }
+}
+
+// 批量改"已装箱/已寄出/已签收"时，弹箱选择框让用户先选箱子
+async function openBatchBoxForStatus(targetStatus, needBoxItems) {
+  const boxes = await api("/boxes");
+  if (boxes.length === 0) {
+    toast("请先去\"箱子\"页添加至少一个箱子");
+    return;
+  }
+  const itemNames = needBoxItems.map(i => i.name).join("、");
+  const modal = document.createElement("div");
+  modal.className = "modal-overlay";
+  modal.id = "batch-box-for-status-modal";
+  modal.innerHTML = `
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-header">
+        <div class="modal-title">批量改"${targetStatus}"需选箱子</div>
+        <button class="modal-close" onclick="document.getElementById('batch-box-for-status-modal').remove()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;">
+          ${needBoxItems.length} 件无箱物品 (${itemNames}) 需要先指定箱子。
+        </div>
+        <div class="batch-modal-actions">
+          ${boxes.map(b => `<button class="batch-option" onclick="confirmBatchBoxForStatus('${targetStatus}', ${b.id})">${b.box_number} (${b.destination})</button>`).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function confirmBatchBoxForStatus(targetStatus, boxId) {
+  try {
+    // 把所有选中物品按 box_id 分组：有箱子的只改 status，没箱子的同时改 status+box
+    const ids = Array.from(selectedItems);
+    const allItems = await api("/items?keyword=");
+    const selected = allItems.filter(i => ids.includes(i.id));
+    const idsWithBox = selected.filter(i => i.box_id).map(i => i.id);
+    const idsNoBox = selected.filter(i => !i.box_id).map(i => i.id);
+
+    let totalUpdated = 0;
+    // 有箱子的：只改状态
+    if (idsWithBox.length > 0) {
+      const r1 = await api("/items/batch", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: idsWithBox, action: "status", value: targetStatus })
+      });
+      totalUpdated += r1.updated ?? idsWithBox.length;
+    }
+    // 没箱子的：同时改状态+箱子
+    if (idsNoBox.length > 0) {
+      const r2 = await api("/items/batch", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: idsNoBox, action: "status+box", value: { status: targetStatus, box_id: boxId } })
+      });
+      totalUpdated += r2.updated ?? idsNoBox.length;
+    }
+    toast(`已更新 ${totalUpdated} 件物品状态为"${targetStatus}"并装箱`);
+    document.getElementById("batch-box-for-status-modal")?.remove();
+    selectedItems.clear();
+    removeBatchBar();
+    loadItems();
+  } catch (e) {
+    console.error(e);
+    toast("批量更新失败: " + e.message);
+  }
 }
 
 async function openBatchBox() {
