@@ -285,13 +285,13 @@ async function loadItems() {
         ? `<img src="${item.photos[0]}" alt="">`
         : `<span class="item-thumb-text">${escapeHtml(item.name.charAt(0))}</span>`;
       let boxTag;
+      const tagStyle = 'display:inline-block;flex-shrink:0;max-width:fit-content;white-space:nowrap;';
       if (item.box_id) {
-        boxTag = `<span class="item-box-tag clickable" onclick="event.stopPropagation();openBoxChanger(${item.id})">箱#${String(item.box_id).padStart(2,"0")} <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable" style="${tagStyle}" onclick="event.stopPropagation();openBoxChanger(${item.id})">箱#${String(item.box_id).padStart(2,"0")} <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       } else if (["已装箱","已寄出","已签收"].includes(item.status)) {
-        // 状态表示已装箱但无箱子归属 — 显示为异常待分配
-        boxTag = `<span class="item-box-tag clickable warn" onclick="event.stopPropagation();openBoxChanger(${item.id})">未分配箱子 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable warn" style="${tagStyle}" onclick="event.stopPropagation();openBoxChanger(${item.id})">未分配箱子 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       } else {
-        boxTag = `<span class="item-box-tag clickable empty" onclick="event.stopPropagation();openBoxChanger(${item.id})">未装箱 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
+        boxTag = `<span class="item-box-tag clickable empty" style="${tagStyle}" onclick="event.stopPropagation();openBoxChanger(${item.id})">未装箱 <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v12M2 8h12"/></svg></span>`;
       }
       const fragile = item.is_fragile ? '<span class="tag tag-fragile">易碎</span>' : "";
       const isSelected = selectedItems.has(item.id);
