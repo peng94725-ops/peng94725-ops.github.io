@@ -159,6 +159,7 @@
   async function batchUpdate(ids, action, value) {
     const items = await getAll("items");
     const idSet = new Set(ids.map((x) => parseInt(x)));
+    let updated = 0;
     for (const item of items) {
       if (!idSet.has(item.id)) continue;
       if (action === "status") {
@@ -167,11 +168,17 @@
       } else if (action === "box") {
         item.box_id = value ? parseInt(value) : null;
         enforceItemConsistency(item);
+      } else if (action === "status+box") {
+        // 同时改状态+箱子（用于批量改"已装箱"时让用户先选箱子）
+        item.status = value.status;
+        item.box_id = value.box_id ? parseInt(value.box_id) : null;
+        enforceItemConsistency(item);
       }
       item.updated_at = new Date().toISOString();
       await put("items", item);
+      updated++;
     }
-    return { success: true };
+    return { success: true, updated };
   }
 
   // ---------- Boxes ----------
