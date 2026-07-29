@@ -182,6 +182,8 @@
         item.status = value.status;
         item.box_id = value.box_id ? parseInt(value.box_id) : null;
         enforceItemConsistency(item);
+      } else if (action === "category") {
+        item.category = value;
       }
       item.updated_at = new Date().toISOString();
       await put("items", item);
