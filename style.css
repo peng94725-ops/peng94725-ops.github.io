@@ -882,6 +882,8 @@ body {
 .batch-btn:hover { background: #fff; border-color: var(--primary); color: var(--primary); }
 .batch-btn.cancel { flex: 0 0 auto; padding: 10px 14px; color: var(--text-sub); border: none; background: none; }
 .batch-btn.cancel:hover { color: var(--red); }
+.batch-btn.danger { color: var(--red); border-color: var(--red-light); }
+.batch-btn.danger:hover { background: var(--red-light); }
 
 /* Batch Modal: compact */
 .batch-modal-actions {
