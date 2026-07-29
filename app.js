@@ -461,6 +461,7 @@ function updateBatchBar() {
     <button class="batch-btn" onclick="selectAll()">全选</button>
     <button class="batch-btn" onclick="openBatchStatus()">批量改状态</button>
     <button class="batch-btn" onclick="openBatchBox()">批量换箱子</button>
+    <button class="batch-btn" onclick="openBatchCategory()">批量改分类</button>
     <button class="batch-btn danger" onclick="batchDelete()">批量删除</button>
     <button class="batch-btn cancel" onclick="clearBatchSelection()">取消</button>
   `;
@@ -642,6 +643,45 @@ async function batchUpdateBox(boxId) {
     const targetName = boxId ? "指定箱子" : "未装箱";
     toast(`已将 ${result.updated} 件物品移到${targetName}`);
     document.getElementById("batch-box-modal")?.remove();
+    selectedItems.clear();
+    removeBatchBar();
+    loadItems();
+  } catch (e) { toast("批量更新失败: " + e.message); }
+}
+
+// 批量改分类
+async function openBatchCategory() {
+  const cats = await api("/categories");
+  const modal = document.createElement("div");
+  modal.className = "modal-overlay";
+  modal.id = "batch-cat-modal";
+  modal.innerHTML = `
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-header">
+        <div class="modal-title">批量改分类 (${selectedItems.size} 件)</div>
+        <button class="modal-close" onclick="document.getElementById('batch-cat-modal').remove()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="batch-modal-actions">
+          ${cats.map(c => `<button class="batch-option" onclick="doBatchCategory('${c.name}')">${c.name}</button>`).join("")}
+        </div>
+        <div style="height:20px;"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function doBatchCategory(catName) {
+  try {
+    const ids = Array.from(selectedItems);
+    const result = await api("/items/batch", {
+      method: "POST",
+      body: JSON.stringify({ ids, action: "category", value: catName }),
+    });
+    toast(`已将 ${result.updated} 件物品改为"${catName}"`);
+    document.getElementById("batch-cat-modal")?.remove();
     selectedItems.clear();
     removeBatchBar();
     loadItems();
@@ -896,7 +936,7 @@ async function saveAndContinue() {
 
 async function openItemDetail(id) {
   try {
-    const [allItems, allBoxes] = await Promise.all([api("/items?keyword="), api("/boxes")]);
+    const [allItems, allBoxes, allCats] = await Promise.all([api("/items?keyword="), api("/boxes"), api("/categories")]);
     const item = allItems.find(i => i.id === id);
     if (!item) return;
 
@@ -918,7 +958,12 @@ async function openItemDetail(id) {
           ${photos}
           <div class="detail-card">
             <div class="detail-row"><span class="detail-label">去处</span><span class="detail-val">${item.destination}</span></div>
-            <div class="detail-row"><span class="detail-label">分类</span><span class="detail-val">${item.category}</span></div>
+            <div class="detail-row">
+              <span class="detail-label">分类</span>
+              <select class="form-select" style="width:auto;min-width:120px;font-size:12px;padding:6px 28px 6px 10px;" onchange="changeItemCategory(${item.id}, this.value)" id="detail-cat-select">
+                ${allCats.map(c => `<option value="${c.name}" ${item.category === c.name ? "selected" : ""}>${c.name}</option>`).join("")}
+              </select>
+            </div>
             <div class="detail-row">
               <span class="detail-label">箱子</span>
               <select class="form-select" style="width:auto;min-width:140px;font-size:12px;padding:6px 28px 6px 10px;" onchange="changeItemBox(${item.id}, this.value)" id="detail-box-select">
@@ -967,6 +1012,14 @@ async function changeItemBox(itemId, boxId) {
     });
     if (boxId && item && item.status === "待整理") toast("已装箱：" + (boxId ? "箱#" + String(boxId).padStart(2,"0") : ""));
     else toast(boxId ? "箱子已更新" : "已从箱子移出，状态回退为待整理");
+    loadItems();
+  } catch (e) { toast("更新失败"); }
+}
+
+async function changeItemCategory(itemId, catName) {
+  try {
+    await api(`/items/${itemId}`, { method: "PUT", body: JSON.stringify({ category: catName }) });
+    toast("分类已更新");
     loadItems();
   } catch (e) { toast("更新失败"); }
 }
