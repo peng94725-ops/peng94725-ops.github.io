@@ -159,6 +159,12 @@
     return { success: true };
   }
 
+  async function batchDelete(ids) {
+    let deleted = 0;
+    for (const id of ids) { await del("items", parseInt(id)); deleted++; }
+    return { success: true, deleted };
+  }
+
   async function batchUpdate(ids, action, value) {
     const items = await getAll("items");
     const idSet = new Set(ids.map((x) => parseInt(x)));
@@ -330,7 +336,7 @@
   }
 
   const db = {
-    init, getItems, addItem, updateItem, deleteItem, batchUpdate,
+    init, getItems, addItem, updateItem, deleteItem, batchUpdate, batchDelete,
     getBoxes, addBox, updateBox, deleteBox,
     getCategories, addCategory, deleteCategory,
     getStats, exportAll, importAll, clearAll
