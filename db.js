@@ -74,14 +74,17 @@
 
   async function init() {
     await openDB();
-    const existing = await getAll("items");
-    if (existing.length === 0) {
-      // 首次运行：写入种子数据
-      let counters = { nextItemId: 1, nextBoxId: 1, nextCategoryId: 1 };
-      for (const it of SEED.items) { await put("items", { ...it, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); counters.nextItemId = Math.max(counters.nextItemId, it.id + 1); }
-      for (const b of SEED.boxes) { await put("boxes", { ...b, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); counters.nextBoxId = Math.max(counters.nextBoxId, b.id + 1); }
-      for (const c of SEED.categories) { await put("categories", c); counters.nextCategoryId = Math.max(counters.nextCategoryId, c.id + 1); }
-      await setCounters(counters);
+    // 不再自动写入演示数据：用户删空后必须保持为空。
+    // 仅在"从未初始化过分类"时补默认分类（分类是功能必需项，物品/箱子不是）。
+    const seededFlag = await reqAsync(tx("meta", "readonly").get("seeded"));
+    if (!seededFlag) {
+      const cats = await getAll("categories");
+      if (cats.length === 0) {
+        let counters = await getCounters();
+        for (const c of SEED.categories) { await put("categories", c); counters.nextCategoryId = Math.max(counters.nextCategoryId, c.id + 1); }
+        await setCounters(counters);
+      }
+      await put("meta", { key: "seeded", value: true });
     }
   }
 
