@@ -678,7 +678,7 @@ async function batchDelete() {
 async function doBatchDelete() {
   const ids = [...selectedItems];
   try {
-    const result = await api("/items/batch-delete", { ids });
+    const result = await api("/items/batch-delete", { method: "POST", body: { ids } });
     toast(`已删除 ${result.deleted} 件物品`);
     document.getElementById("batch-delete-modal")?.remove();
     selectedItems.clear();
