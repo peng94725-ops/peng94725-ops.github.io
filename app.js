@@ -188,19 +188,32 @@ async function loadDashboard() {
       </div>`;
     }).join("");
 
-    // Progress bar
+    // Progress bar — 堆叠条，4段按比例显示
     const total = stats.totalItems;
-    const received = stats.byStatus["已签收"] || 0;
-    const pct = total > 0 ? (received / total * 100).toFixed(0) : 0;
     const segs = [
       { label: "待整理", val: stats.byStatus["待整理"] || 0, color: "#D3D1C7" },
       { label: "已装箱", val: stats.byStatus["已装箱"] || 0, color: "#AFA9EC" },
       { label: "已寄出", val: stats.byStatus["已寄出"] || 0, color: "#7F77DD" },
-      { label: "已签收", val: received, color: "#534AB7" },
+      { label: "已签收", val: stats.byStatus["已签收"] || 0, color: "#534AB7" },
     ];
+    // 整理进度 = 非"待整理"的占比
+    const sorted = total > 0 ? total - (stats.byStatus["待整理"] || 0) : 0;
+    const pct = total > 0 ? Math.round(sorted / total * 100) : 0;
 
-    document.getElementById("progress-pct").textContent = pct + "%";
-    document.getElementById("progress-fill").style.width = pct + "%";
+    document.getElementById("progress-pct").textContent = total > 0 ? pct + "%" : "--";
+    // 堆叠条：每段宽度 = 该状态数量 / 总数 * 100%
+    const barFill = document.getElementById("progress-fill");
+    if (total > 0) {
+      barFill.innerHTML = segs.map(s => {
+        const w = total > 0 ? (s.val / total * 100) : 0;
+        return w > 0 ? `<div style="display:inline-block;height:100%;width:${w}%;background:${s.color};float:left;"></div>` : "";
+      }).join("");
+      barFill.style.width = "100%";
+      barFill.style.background = "transparent";
+    } else {
+      barFill.innerHTML = "";
+      barFill.style.width = "0%";
+    }
     document.getElementById("progress-legend").innerHTML = total > 0
       ? segs.map(s => `<span><i style="background:${s.color}"></i>${s.label} ${s.val}</span>`).join("")
       : '<span style="color:var(--text-muted)">还没有物品，添加后查看进度</span>';
