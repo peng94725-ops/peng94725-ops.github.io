@@ -21,6 +21,7 @@ async function api(path, opts = {}) {
   if (p === "/items" && method === "GET") return await DB.getItems(filters);
   if (p === "/items" && method === "POST") return await DB.addItem(body);
   if (p === "/items/batch" && method === "POST") return await DB.batchUpdate(body.ids, body.action, body.value);
+  if (p === "/items/batch-delete" && method === "POST") return await DB.batchDelete(body.ids);
   let m = p.match(/^\/items\/(\d+)$/);
   if (m && method === "PUT") return await DB.updateItem(parseInt(m[1]), body);
   if (m && method === "DELETE") return await DB.deleteItem(parseInt(m[1]));
@@ -447,6 +448,7 @@ function updateBatchBar() {
     <button class="batch-btn" onclick="selectAll()">全选</button>
     <button class="batch-btn" onclick="openBatchStatus()">批量改状态</button>
     <button class="batch-btn" onclick="openBatchBox()">批量换箱子</button>
+    <button class="batch-btn danger" onclick="batchDelete()">批量删除</button>
     <button class="batch-btn cancel" onclick="clearBatchSelection()">取消</button>
   `;
   document.getElementById("app").appendChild(bar);
@@ -631,6 +633,45 @@ async function batchUpdateBox(boxId) {
     removeBatchBar();
     loadItems();
   } catch (e) { toast("批量更新失败: " + e.message); }
+}
+
+// 批量删除
+async function batchDelete() {
+  const ids = [...selectedItems];
+  if (ids.length === 0) return;
+  // 确认弹框
+  const modal = document.createElement("div");
+  modal.className = "modal-overlay";
+  modal.id = "batch-delete-modal";
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">确认删除</div>
+        <button class="modal-close" onclick="document.getElementById('batch-delete-modal').remove()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>确定要删除选中的 <b>${ids.length}</b> 件物品吗？</p>
+        <p style="color:#e74c3c;font-size:13px;margin-top:8px">此操作不可撤销</p>
+      </div>
+      <div class="modal-actions" style="display:flex;gap:10px;padding:0 20px 20px;">
+        <button class="btn-secondary" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:15px;cursor:pointer;" onclick="document.getElementById('batch-delete-modal').remove()">取消</button>
+        <button class="btn-danger" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;" onclick="doBatchDelete()">确认删除</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+async function doBatchDelete() {
+  const ids = [...selectedItems];
+  try {
+    const result = await api("/items/batch-delete", { ids });
+    toast(`已删除 ${result.deleted} 件物品`);
+    document.getElementById("batch-delete-modal")?.remove();
+    selectedItems.clear();
+    removeBatchBar();
+    loadItems();
+  } catch (e) { toast("批量删除失败: " + e.message); }
 }
 
 // ==================== Add Item ====================
