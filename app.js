@@ -1266,7 +1266,13 @@ async function openBoxDetail(id) {
         </div>
         <div class="modal-body">
           <div class="detail-card">
-            <div class="detail-row"><span class="detail-label">去处</span><span class="detail-val">${box.destination}</span></div>
+            <div class="detail-row"><span class="detail-label">去处</span>
+              <select class="form-select" style="width:auto;min-width:120px;font-size:12px;padding:6px 28px 6px 10px;" onchange="changeBoxDestination(${box.id}, this.value)" id="detail-box-dest-select">
+                <option value="新城市" ${box.destination === '新城市' ? 'selected' : ''}>新城市</option>
+                <option value="老家" ${box.destination === '老家' ? 'selected' : ''}>老家</option>
+                <option value="丢弃" ${box.destination === '丢弃' ? 'selected' : ''}>丢弃</option>
+              </select>
+            </div>
             <div class="detail-row"><span class="detail-label">寄送方式</span><span class="detail-val">${box.shipping_method}</span></div>
             <div class="detail-row"><span class="detail-label">状态</span><span class="detail-val">${box.status}</span></div>
             <div class="detail-row"><span class="detail-label">物品数</span><span class="detail-val">${box.item_count} 件</span></div>
@@ -1328,6 +1334,18 @@ async function updateBoxStatus(id) {
     });
     toast("状态已更新");
     document.getElementById("box-detail-modal").remove();
+    loadBoxes();
+  } catch (e) { toast("更新失败"); }
+}
+
+async function changeBoxDestination(boxId, dest) {
+  try {
+    await api(`/boxes/${boxId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destination: dest }),
+    });
+    toast("去处已更新");
     loadBoxes();
   } catch (e) { toast("更新失败"); }
 }
