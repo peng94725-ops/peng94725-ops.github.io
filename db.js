@@ -72,6 +72,15 @@
   }
   async function setCounters(c) { await put("meta", { key: "counters", value: c }); }
 
+  async function getMeta(key) {
+    const m = await reqAsync(tx("meta", "readonly").get(key));
+    return m ? m.value : null;
+  }
+
+  async function setMeta(key, value) {
+    await put("meta", { key, value });
+  }
+
   async function init() {
     await openDB();
     // 不再自动写入演示数据：用户删空后必须保持为空。
@@ -341,7 +350,7 @@
     init, getItems, addItem, updateItem, deleteItem, batchUpdate, batchDelete,
     getBoxes, addBox, updateBox, deleteBox,
     getCategories, addCategory, deleteCategory,
-    getStats, exportAll, importAll, clearAll
+    getStats, exportAll, importAll, clearAll, getMeta, setMeta
   };
   global.DB = db;
   if (typeof module !== "undefined" && module.exports) module.exports = db;
