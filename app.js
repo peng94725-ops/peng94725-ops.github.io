@@ -845,14 +845,38 @@ function toggleFragile() {
 function onPhotoSelect(e) {
   const files = Array.from(e.target.files);
   files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      addPhotos.push({ file, dataUrl: ev.target.result });
+    compressPhoto(file, 800, 0.7).then(dataUrl => {
+      addPhotos.push({ file, dataUrl });
       renderPhotoPreview();
-    };
-    reader.readAsDataURL(file);
+    }).catch(err => {
+      console.error("photo compress failed", err);
+      toast("图片处理失败，请重试");
+    });
   });
   e.target.value = "";
+}
+
+// 压缩照片：缩放到 maxWidth，JPEG quality 压缩
+function compressPhoto(file, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderPhotoPreview() {
@@ -909,7 +933,7 @@ async function saveItem() {
   };
 
   try {
-    await api("/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    await api("/items", { method: "POST", body: payload });
     toast("保存成功");
     if (continuousMode) {
       continuousCount++;
@@ -921,7 +945,7 @@ async function saveItem() {
     } else {
       closeAddItem();
       if (currentPage === "items") loadItems();
-      if (currentPage === "dashboard") render(); loadDashboard();
+      else if (currentPage === "dashboard") { render(); loadDashboard(); }
     }
   } catch (e) {
     toast("保存失败: " + e.message);
