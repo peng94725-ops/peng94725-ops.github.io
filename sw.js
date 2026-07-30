@@ -1,4 +1,4 @@
-const CACHE_NAME = "move-inventory-v16";
+const CACHE_NAME = "move-inventory-v17";
 const ASSETS = [
   "./",
   "./index.html",
@@ -15,7 +15,7 @@ self.addEventListener("install", (e) => {
     caches.open(CACHE_NAME).then((cache) =>
       Promise.all(
         ASSETS.map((u) =>
-          fetch(u + "?v=16", { cache: "no-cache" })
+          fetch(u + "?v=17", { cache: "no-cache" })
             .then((r) => r.ok ? cache.put(u, r) : null)
             .catch(() => null)
         )
