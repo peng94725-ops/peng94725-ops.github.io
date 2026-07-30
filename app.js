@@ -879,6 +879,70 @@ function compressPhoto(file, maxWidth, quality) {
   });
 }
 
+// 压缩已有的 base64 照片（用于历史数据迁移）
+function compressExistingPhoto(dataUrl, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// 历史照片迁移：启动时自动压缩过大的已有照片
+async function migratePhotos() {
+  try {
+    const migrated = await DB.getMeta("photo-migrated-v1");
+    if (migrated) return;
+
+    const items = await api("/items?keyword=");
+    let totalCompressed = 0;
+
+    for (const item of items) {
+      if (!item.photos || item.photos.length === 0) continue;
+      let changed = false;
+      const newPhotos = [];
+
+      for (const photo of item.photos) {
+        // base64 字符串 > 200K 字符 ≈ 原图 > 150KB
+        if (typeof photo === "string" && photo.length > 200000) {
+          try {
+            const compressed = await compressExistingPhoto(photo, 800, 0.7);
+            newPhotos.push(compressed);
+            totalCompressed++;
+            changed = true;
+          } catch (e) {
+            newPhotos.push(photo);
+          }
+        } else {
+          newPhotos.push(photo);
+        }
+      }
+
+      if (changed) {
+        await api(`/items/${item.id}`, { method: "PUT", body: { photos: newPhotos } });
+      }
+    }
+
+    await DB.setMeta("photo-migrated-v1", true);
+    if (totalCompressed > 0) {
+      toast(`已自动压缩 ${totalCompressed} 张历史照片`);
+      loadItems();
+    }
+  } catch (e) {
+    console.error("Photo migration failed:", e);
+  }
+}
+
 function renderPhotoPreview() {
   const el = document.getElementById("photo-preview");
   const area = document.getElementById("photo-area");
@@ -1630,6 +1694,8 @@ async function init() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+  // 后台迁移历史大照片，不阻塞 UI
+  migratePhotos();
 }
 
 init();
